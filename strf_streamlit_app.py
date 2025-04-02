@@ -1,30 +1,10 @@
-
-import streamlit as st
+# scheduler.py
 import matplotlib.pyplot as plt
-import matplotlib.colors as mcolors
 import matplotlib.patches as patches
-import base64
-from io import BytesIO
-import random
+import matplotlib.colors as mcolors
 
-st.set_page_config(page_title="STRF Scheduler", layout="centered")
-st.title("STRF Scheduler Simulator (Streamlit)")
-
-with st.sidebar:
-    st.header("Configuration")
-    num_jobs = st.slider("Number of Jobs", 1, 10, 3)
-    num_cpus = st.slider("Number of CPUs", 1, 5, 2)
-    chunk_unit = st.selectbox("Chunk Time Unit", [1, 1.5, 2, 2.5, 3, 3.5, 4.5, 5])
-
-    if st.button("Randomize"):
-        arrivals = [random.randint(1, 10) for _ in range(num_jobs)]
-        bursts = [random.choice([1, 1.5, 2, 2.5, 3, 3.5, 4.5, 5]) for _ in range(num_jobs)]
-    else:
-        arrivals = [st.number_input(f"Arrival Time for J{i+1}", value=float(i+1), key=f"a{i}") for i in range(num_jobs)]
-        bursts = [st.number_input(f"Burst Time for J{i+1}", value=2.0, key=f"b{i}") for i in range(num_jobs)]
-
-if st.button("Run Scheduler"):
-    processes = [{'id': f'J{i+1}', 'arrival_time': arrivals[i], 'burst_time': bursts[i]} for i in range(num_jobs)]
+def run_strf_simulation(processes, num_cpus, chunk_unit):
+    # Setup state
     arrival_time = {p['id']: p['arrival_time'] for p in processes}
     burst_time = {p['id']: p['burst_time'] for p in processes}
     remaining_time = {p['id']: p['burst_time'] for p in processes}
@@ -32,6 +12,7 @@ if st.button("Run Scheduler"):
     end_time = {}
     job_chunks = {}
 
+    # Break jobs into user-defined chunks
     for job_id, total_time in burst_time.items():
         chunks = []
         remaining = total_time
@@ -41,77 +22,154 @@ if st.button("Run Scheduler"):
             remaining -= chunk
         job_chunks[job_id] = chunks
 
+    # CPU setup
     cpu_names = [f"CPU{i+1}" for i in range(num_cpus)]
     busy_until = {cpu: 0 for cpu in cpu_names}
     current_jobs = {cpu: None for cpu in cpu_names}
     busy_jobs = set()
 
+    # Simulation state
     gantt_data = []
+    queue_snapshots = []
     current_time = 0
     jobs_completed = 0
 
+    # Capture queue state at each scheduling point
+    def capture_queue_state(time, available_jobs):
+        active_jobs = [j for j in available_jobs if remaining_time[j] > 0]
+        queue = sorted(active_jobs, key=lambda job_id: (remaining_time[job_id], arrival_time[job_id]))
+        job_info = [(job, round(remaining_time[job], 1)) for job in queue]
+        if job_info:
+            queue_snapshots.append((time, job_info))
+
+    # Initial queue
+    initial_available_jobs = [p['id'] for p in processes if p['arrival_time'] <= current_time]
+    capture_queue_state(current_time, initial_available_jobs)
+
+    # Simulation loop
     while jobs_completed < len(processes):
-        for cpu in cpu_names:
-            if busy_until[cpu] <= current_time and current_jobs[cpu]:
-                busy_jobs.discard(current_jobs[cpu])
+        next_events = []
+
+        for cpu, time in busy_until.items():
+            if time <= current_time:
+                next_events.append((current_time, "CPU_AVAILABLE", cpu))
+
+        for job_id, time in arrival_time.items():
+            if time > current_time and remaining_time[job_id] > 0:
+                next_events.append((time, "JOB_ARRIVAL", job_id))
+
+        if not next_events:
+            future_times = [t for _, t in busy_until.items() if t > current_time] + \
+                           [t for j, t in arrival_time.items() if t > current_time and remaining_time[j] > 0]
+            if future_times:
+                current_time = min(future_times)
+            continue
+
+        next_events.sort(key=lambda x: (x[0], cpu_names.index(x[2]) if x[1] == "CPU_AVAILABLE" else num_cpus + 1))
+
+        for cpu, busy_time in busy_until.items():
+            if busy_time == current_time and current_jobs[cpu] is not None:
+                job_id = current_jobs[cpu]
+                if job_id in busy_jobs:
+                    busy_jobs.remove(job_id)
                 current_jobs[cpu] = None
 
         available_cpus = [cpu for cpu in cpu_names if busy_until[cpu] <= current_time and current_jobs[cpu] is None]
-        available_jobs = [j for j in remaining_time if remaining_time[j] > 0 and arrival_time[j] <= current_time and j not in busy_jobs]
+        available_jobs = [job_id for job_id in remaining_time
+                          if remaining_time[job_id] > 0 and arrival_time[job_id] <= current_time and job_id not in busy_jobs]
 
-        if not available_cpus or not available_jobs:
-            future_times = [t for t in busy_until.values() if t > current_time] + \
+        if available_cpus and available_jobs:
+            capture_queue_state(current_time, available_jobs)
+
+        if not available_jobs or not available_cpus:
+            future_times = [busy_until[cpu] for cpu in busy_until if busy_until[cpu] > current_time] + \
                            [arrival_time[j] for j in arrival_time if arrival_time[j] > current_time and remaining_time[j] > 0]
-            current_time = min(future_times) if future_times else current_time + 0.1
+            if future_times:
+                current_time = min(future_times)
             continue
 
-        available_jobs.sort(key=lambda j: (remaining_time[j], arrival_time[j]))
+        available_jobs.sort(key=lambda job_id: (remaining_time[job_id], arrival_time[job_id]))
 
         for cpu in available_cpus:
             if not available_jobs:
                 break
-            job = available_jobs.pop(0)
-            if job not in start_time:
-                start_time[job] = current_time
-            chunk_size = job_chunks[job].pop(0)
-            remaining_time[job] -= chunk_size
-            current_jobs[cpu] = job
-            busy_jobs.add(job)
+
+            selected_job = available_jobs.pop(0)
+            if selected_job not in start_time:
+                start_time[selected_job] = current_time
+
+            chunk_size = job_chunks[selected_job].pop(0)
+            busy_jobs.add(selected_job)
+            current_jobs[cpu] = selected_job
+
+            remaining_time[selected_job] -= chunk_size
             busy_until[cpu] = current_time + chunk_size
-            gantt_data.append((current_time, cpu, job, chunk_size))
-            if abs(remaining_time[job]) < 0.001:
-                end_time[job] = current_time + chunk_size
+            gantt_data.append((current_time, cpu, selected_job, chunk_size))
+
+            if abs(remaining_time[selected_job]) < 0.001:
+                end_time[selected_job] = current_time + chunk_size
                 jobs_completed += 1
 
-        future_times = [t for t in busy_until.values() if t > current_time] + \
-                       [arrival_time[j] for j in arrival_time if arrival_time[j] > current_time and remaining_time[j] > 0]
-        current_time = min(future_times) if future_times else current_time + 0.1
+        next_time_events = [busy_until[cpu] for cpu in busy_until if busy_until[cpu] > current_time] + \
+                           [arrival_time[j] for j in arrival_time if arrival_time[j] > current_time and remaining_time[j] > 0]
 
+        if next_time_events:
+            current_time = min(next_time_events)
+        else:
+            current_time += 0.1
+
+    # Update processes with results
     for p in processes:
         p['start_time'] = start_time[p['id']]
         p['end_time'] = end_time[p['id']]
         p['turnaround_time'] = p['end_time'] - p['arrival_time']
 
-    st.subheader("Job Summary Table")
-    st.table([{**p} for p in processes])
+    avg_turnaround = sum(p['turnaround_time'] for p in processes) / len(processes)
 
-    avg_tat = sum(p['turnaround_time'] for p in processes) / len(processes)
-    st.success(f"Average Turnaround Time: {avg_tat:.2f}")
+    return gantt_data, queue_snapshots, processes, avg_turnaround
 
-    # Gantt Chart
-    fig, ax = plt.subplots(figsize=(10, 5))
-    cmap = plt.colormaps.get_cmap('tab10')
-    colors = {f'J{i+1}': cmap(i % 10) for i in range(len(processes))}
-    y_pos = {cpu: i for i, cpu in enumerate(cpu_names)}
+def draw_gantt_with_queue(gantt_data, queue_snapshots, num_cpus, processes):
+    max_time = max(p['end_time'] for p in processes)
+    fig, ax = plt.subplots(figsize=(14, 6))
 
-    for start, cpu, job, dur in gantt_data:
-        y = y_pos[cpu]
-        ax.barh(y, dur, left=start, color=colors[job], edgecolor='black')
-        ax.text(start + dur / 2, y, job, ha='center', va='center', color='white', fontsize=8)
+    # Generate dynamic colors for each job
+    cmap = plt.colormaps.get_cmap('tab20')
+    colors = {f'J{i+1}': mcolors.to_hex(cmap(i / max(len(processes), 1))) for i in range(len(processes))}
 
-    ax.set_yticks(list(y_pos.values()))
-    ax.set_yticklabels(cpu_names)
-    ax.set_xlabel("Time")
-    ax.set_title("STRF Scheduling Gantt Chart")
+    cpu_names = [f"CPU{i+1}" for i in range(num_cpus)]
+    cpu_ypos = {cpu: num_cpus - idx for idx, cpu in enumerate(cpu_names)}
+
+    for start_time, cpu, job, duration in gantt_data:
+        y_pos = cpu_ypos[cpu]
+        ax.barh(y=y_pos, width=duration, left=start_time,
+                color=colors[job], edgecolor='black')
+        ax.text(start_time + duration / 2, y_pos, job,
+                ha='center', va='center', color='white', fontsize=9)
+
+    for t in range(int(max_time) + 1):
+        ax.axvline(x=t, color='black', linestyle='--', alpha=0.3)
+
+    ax.set_yticks(list(cpu_ypos.values()))
+    ax.set_yticklabels(cpu_ypos.keys())
+    ax.set_xlim(0, max_time + 0.5)
+    ax.set_xlabel("Time (seconds)")
+    ax.set_title("Multi-CPU STRF with User-Defined Chunks and Dynamic Colors")
+
+    # Queue visualization
+    queue_y_base = -1
+    for time, job_queue in queue_snapshots:
+        for i, (job_id, remaining) in enumerate(job_queue):
+            box_y = queue_y_base - i * 0.6
+            rect = patches.Rectangle((time - 0.25, box_y - 0.25), 0.5, 0.5,
+                                     linewidth=1, edgecolor='black', facecolor='white', fill=True)
+            ax.add_patch(rect)
+            ax.text(time, box_y, f"{job_id} = {remaining}", ha='center', va='center', fontsize=7)
+
+    if queue_snapshots:
+        max_len = max(len(q[1]) for q in queue_snapshots)
+        min_y = queue_y_base - max_len * 0.6 - 0.5
+        ax.set_ylim(min_y, max(cpu_ypos.values()) + 1)
+
     plt.tight_layout()
-    st.pyplot(fig)
+    plt.grid(axis='x')
+    return fig
