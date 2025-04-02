@@ -33,8 +33,12 @@ def main():
         st.write(f"\nAverage Turnaround Time: {avg_turnaround:.2f}")
 
         # Draw and display Gantt chart
+        st.subheader("Gantt Chart")
         fig = draw_gantt_with_queue(gantt_data, queue_snapshots, num_cpus, processes)
-        st.pyplot(fig)
+        if fig is None:
+            st.error("Failed to generate Gantt chart.")
+        else:
+            st.pyplot(fig)
 
 if __name__ == "__main__":
     main()
