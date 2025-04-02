@@ -129,6 +129,9 @@ def run_strf_simulation(processes, num_cpus, chunk_unit):
     return gantt_data, queue_snapshots, processes, avg_turnaround
 
 def draw_gantt_with_queue(gantt_data, queue_snapshots, num_cpus, processes):
+    if not gantt_data:
+        return None  # Return None if there's no data to plot
+
     max_time = max(p['end_time'] for p in processes)
     fig, ax = plt.subplots(figsize=(14, 6))
 
@@ -172,4 +175,4 @@ def draw_gantt_with_queue(gantt_data, queue_snapshots, num_cpus, processes):
 
     plt.tight_layout()
     plt.grid(axis='x')
-    return fig
+    return fig  # Return the figure object explicitly
