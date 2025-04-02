@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>STRF Scheduler Simulator</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="container">
+    <h1>STRF Scheduler</h1>
+
+    <div class="form-group">
+      <label>Number of Jobs: <input type="number" id="numJobs" min="1" max="10" value="3" /></label>
+      <label>Number of CPUs: <input type="number" id="numCPUs" min="1" max="5" value="2" /></label>
+      <label>Chunk Time Unit: <input type="number" step="0.5" id="chunkUnit" value="1" /></label>
+      <button id="randomBtn">Randomize</button>
+      <button id="runBtn">Run Scheduler</button>
+    </div>
+
+    <div id="jobInputs"></div>
+
+    <h2>Output</h2>
+    <textarea id="pyOutput" rows="10" readonly></textarea>
+    <div id="chart"></div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/pyodide/v0.24.1/full/pyodide.js"></script>
+  <script src="script.js"></script>
+</body>
+</html>
