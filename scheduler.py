@@ -143,7 +143,7 @@ def draw_gantt_with_queue(gantt_data, queue_snapshots, num_cpus, processes):
     ax.set_xlabel("Time (seconds)")
     ax.set_title("Multi-CPU STRF with User-Defined Chunks and Dynamic Colors")
 
-    queue_y_base = -1
+    queue_y_base = - Wanted to deploy my app on streamlit cloud but facing ModuleNotFoundError1
     for time, job_queue in queue_snapshots:
         for i, (job_id, remaining) in enumerate(job_queue):
             box_y = queue_y_base - i * 0.6
