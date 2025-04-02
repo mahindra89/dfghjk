@@ -1,10 +1,8 @@
-# scheduler.py
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 import matplotlib.colors as mcolors
 
 def run_strf_simulation(processes, num_cpus, chunk_unit):
-    # Setup state
     arrival_time = {p['id']: p['arrival_time'] for p in processes}
     burst_time = {p['id']: p['burst_time'] for p in processes}
     remaining_time = {p['id']: p['burst_time'] for p in processes}
@@ -12,7 +10,6 @@ def run_strf_simulation(processes, num_cpus, chunk_unit):
     end_time = {}
     job_chunks = {}
 
-    # Break jobs into user-defined chunks
     for job_id, total_time in burst_time.items():
         chunks = []
         remaining = total_time
@@ -22,19 +19,16 @@ def run_strf_simulation(processes, num_cpus, chunk_unit):
             remaining -= chunk
         job_chunks[job_id] = chunks
 
-    # CPU setup
     cpu_names = [f"CPU{i+1}" for i in range(num_cpus)]
     busy_until = {cpu: 0 for cpu in cpu_names}
     current_jobs = {cpu: None for cpu in cpu_names}
     busy_jobs = set()
 
-    # Simulation state
     gantt_data = []
     queue_snapshots = []
     current_time = 0
     jobs_completed = 0
 
-    # Capture queue state at each scheduling point
     def capture_queue_state(time, available_jobs):
         active_jobs = [j for j in available_jobs if remaining_time[j] > 0]
         queue = sorted(active_jobs, key=lambda job_id: (remaining_time[job_id], arrival_time[job_id]))
@@ -42,18 +36,14 @@ def run_strf_simulation(processes, num_cpus, chunk_unit):
         if job_info:
             queue_snapshots.append((time, job_info))
 
-    # Initial queue
     initial_available_jobs = [p['id'] for p in processes if p['arrival_time'] <= current_time]
     capture_queue_state(current_time, initial_available_jobs)
 
-    # Simulation loop
     while jobs_completed < len(processes):
         next_events = []
-
         for cpu, time in busy_until.items():
             if time <= current_time:
                 next_events.append((current_time, "CPU_AVAILABLE", cpu))
-
         for job_id, time in arrival_time.items():
             if time > current_time and remaining_time[job_id] > 0:
                 next_events.append((time, "JOB_ARRIVAL", job_id))
@@ -93,7 +83,6 @@ def run_strf_simulation(processes, num_cpus, chunk_unit):
         for cpu in available_cpus:
             if not available_jobs:
                 break
-
             selected_job = available_jobs.pop(0)
             if selected_job not in start_time:
                 start_time[selected_job] = current_time
@@ -112,30 +101,26 @@ def run_strf_simulation(processes, num_cpus, chunk_unit):
 
         next_time_events = [busy_until[cpu] for cpu in busy_until if busy_until[cpu] > current_time] + \
                            [arrival_time[j] for j in arrival_time if arrival_time[j] > current_time and remaining_time[j] > 0]
-
         if next_time_events:
             current_time = min(next_time_events)
         else:
             current_time += 0.1
 
-    # Update processes with results
     for p in processes:
         p['start_time'] = start_time[p['id']]
         p['end_time'] = end_time[p['id']]
         p['turnaround_time'] = p['end_time'] - p['arrival_time']
 
     avg_turnaround = sum(p['turnaround_time'] for p in processes) / len(processes)
-
     return gantt_data, queue_snapshots, processes, avg_turnaround
 
 def draw_gantt_with_queue(gantt_data, queue_snapshots, num_cpus, processes):
     if not gantt_data:
-        return None  # Return None if there's no data to plot
+        return None
 
     max_time = max(p['end_time'] for p in processes)
     fig, ax = plt.subplots(figsize=(14, 6))
 
-    # Generate dynamic colors for each job
     cmap = plt.colormaps.get_cmap('tab20')
     colors = {f'J{i+1}': mcolors.to_hex(cmap(i / max(len(processes), 1))) for i in range(len(processes))}
 
@@ -158,7 +143,6 @@ def draw_gantt_with_queue(gantt_data, queue_snapshots, num_cpus, processes):
     ax.set_xlabel("Time (seconds)")
     ax.set_title("Multi-CPU STRF with User-Defined Chunks and Dynamic Colors")
 
-    # Queue visualization
     queue_y_base = -1
     for time, job_queue in queue_snapshots:
         for i, (job_id, remaining) in enumerate(job_queue):
@@ -175,4 +159,4 @@ def draw_gantt_with_queue(gantt_data, queue_snapshots, num_cpus, processes):
 
     plt.tight_layout()
     plt.grid(axis='x')
-    return fig  # Return the figure object explicitly
+    return fig
