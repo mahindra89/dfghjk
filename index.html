@@ -3,88 +3,34 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CPU Scheduler Simulator</title>
-    
-    <!-- PyScript and dependencies -->
-    <link rel="stylesheet" href="https://pyscript.net/releases/2023.03.1/pyscript.css" />
-    <script defer src="https://pyscript.net/releases/2023.03.1/pyscript.js"></script>
-    
-    <!-- Bootstrap for styling -->
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    
-    <!-- Custom styles -->
-    <link rel="stylesheet" href="styles.css">
-    
-    <!-- PyScript configuration -->
-    <py-config>
-        packages = ["matplotlib", "numpy"]
-        
-        [[fetch]]
-        files = ["scheduler.py"]
-    </py-config>
+    <title>Multicore STRF Scheduler</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
 </head>
 <body>
-    <div class="container mt-4">
-        <h1 class="text-center mb-4">CPU Scheduler Simulator</h1>
-        
-        <div class="row">
-            <div class="col-md-4">
-                <div class="card">
-                    <div class="card-header">
-                        <h4>Setup Parameters</h4>
-                    </div>
-                    <div class="card-body">
-                        <div class="mb-3">
-                            <label for="num_jobs" class="form-label">Number of Jobs:</label>
-                            <input type="number" id="num_jobs" class="form-control" value="3" min="1" max="10">
-                        </div>
-                        <div class="mb-3">
-                            <label for="num_cpus" class="form-label">Number of CPUs:</label>
-                            <input type="number" id="num_cpus" class="form-control" value="2" min="1" max="8">
-                        </div>
-                        <div class="mb-3">
-                            <label for="chunk_unit" class="form-label">Time Unit for Chunks:</label>
-                            <input type="number" id="chunk_unit" class="form-control" value="1.0" min="0.1" step="0.1">
-                        </div>
-                        <div class="mb-3">
-                            <label for="quantum_time" class="form-label">Quantum Time:</label>
-                            <input type="number" id="quantum_time" class="form-control" value="1.0" min="0.1" step="0.1">
-                        </div>
-                        <button id="setup-btn" class="btn btn-primary" pys-onClick="setup_simulation">Next: Add Jobs</button>
-                    </div>
-                </div>
-            </div>
-            
-            <div class="col-md-8" id="jobs-section" style="display: none;">
-                <div class="card">
-                    <div class="card-header">
-                        <h4>Job Information</h4>
-                    </div>
-                    <div class="card-body" id="jobs-container">
-                        <!-- Job input fields will be added here dynamically -->
-                    </div>
-                    <div class="card-footer">
-                        <button id="simulate-btn" class="btn btn-success" pys-onClick="run_simulation">Run Simulation</button>
-                    </div>
-                </div>
-            </div>
+    <h1>Multicore STRF Scheduler</h1>
+    {% if error %}
+        <p style="color: red;">Error: {{ error }}</p>
+    {% endif %}
+    <form method="POST">
+        <label for="num_jobs">Number of Jobs:</label>
+        <input type="number" id="num_jobs" name="num_jobs" required><br>
+
+        <label for="num_cpus">Number of CPUs:</label>
+        <input type="number" id="num_cpus" name="num_cpus" required><br>
+
+        <label for="chunk_unit">Chunk Unit:</label>
+        <input type="number" step="0.1" id="chunk_unit" name="chunk_unit" required><br>
+
+        <div id="job-details">
+            {% for i in range(5) %} <!-- Default 5 jobs -->
+            <h3>Job J{{ i+1 }}</h3>
+            <label>Arrival Time:</label>
+            <input type="number" step="0.1" name="arrival_{{ i }}" required><br>
+            <label>Burst Time:</label>
+            <input type="number" step="0.1" name="burst_{{ i }}" required><br>
+            {% endfor %}
         </div>
-        
-        <div class="row mt-4">
-            <div class="col-12">
-                <div class="card">
-                    <div class="card-header">
-                        <h4>Results</h4>
-                    </div>
-                    <div class="card-body">
-                        <div id="results-text" class="mb-4"></div>
-                        <div id="gantt-chart"></div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-    
-    <py-script src="scheduler.py"></py-script>
+        <button type="submit">Submit</button>
+    </form>
 </body>
 </html>
