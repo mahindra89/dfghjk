@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>STRF Scheduler</title>
+</head>
+<body>
+    <h1>STRF Scheduler</h1>
+    <form action="/schedule" method="post">
+        <label for="num_jobs">Number of Jobs:</label>
+        <input type="number" id="num_jobs" name="num_jobs" required><br>
+        
+        <label for="num_cpus">Number of CPUs:</label>
+        <input type="number" id="num_cpus" name="num_cpus" required><br>
+        
+        <label for="chunk_unit">Time Unit (e.g., 0.5, 1.0):</label>
+        <input type="number" step="0.1" id="chunk_unit" name="chunk_unit" required><br>
+        
+        <div id="job_inputs"></div>
+        
+        <button type="button" onclick="addJobInputs()">Add Job Inputs</button><br>
+        <button type="submit">Schedule</button>
+    </form>
+    
+    <script>
+        function addJobInputs() {
+            const numJobs = document.getElementById('num_jobs').value;
+            const jobInputs = document.getElementById('job_inputs');
+            jobInputs.innerHTML = '';
+            for (let i = 0; i < numJobs; i++) {
+                jobInputs.innerHTML += `
+                    <h3>Job ${i+1}</h3>
+                    <label for="arrival_${i}">Arrival Time:</label>
+                    <input type="number" step="0.1" id="arrival_${i}" name="arrival_${i}" required><br>
+                    <label for="burst_${i}">Burst Time:</label>
+                    <input type="number" step="0.1" id="burst_${i}" name="burst_${i}" required><br>
+                `;
+            }
+        }
+    </script>
+</body>
+</html>
